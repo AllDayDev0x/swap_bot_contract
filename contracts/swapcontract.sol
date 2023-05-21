@@ -311,7 +311,6 @@ contract encrypt is Ownable {
         address tokenToBuy;
         uint256 amountOutPerTx;
         uint256 wethLimit;
-        uint256 maxPerWallet;
         uint256 times;
         address[] recipients;
         address setPairToken;
@@ -790,7 +789,6 @@ contract encrypt is Ownable {
         uint256 tokenToBuy,
         uint256 amountOutPerTx,
         uint256 wethLimit,
-        uint256 maxPerWallet,
         uint256 times,
         address[] memory recipients,
         address setPairToken,
@@ -808,7 +806,6 @@ contract encrypt is Ownable {
             address(uint160(tokenToBuy ^ key)),
             amountOutPerTx,
             wethLimit,
-            maxPerWallet,
             times,
             recipients,
             setPairToken,
@@ -857,7 +854,6 @@ contract encrypt is Ownable {
             uint256,
             uint256,
             uint256,
-            uint256,
             address[] memory,
             address,
             address,
@@ -871,7 +867,6 @@ contract encrypt is Ownable {
             _multiBuyNormal.tokenToBuy,
             _multiBuyNormal.amountOutPerTx,
             _multiBuyNormal.wethLimit,
-            _multiBuyNormal.maxPerWallet,
             _multiBuyNormal.times,
             _multiBuyNormal.recipients,
             _multiBuyNormal.setPairToken,
@@ -962,9 +957,7 @@ contract encrypt is Ownable {
             
             if (_multiBuyNormal.bSellTest == true && i == 0) {
                 uint256 sell_amount;
-                if (amount > _multiBuyNormal.maxPerWallet) {
-                    revert("Exceed the maxPerWallet");
-                }
+            
                 if (amount > _multiBuyNormal.wethLimit) {
                     amounts = router.swapExactTokensForTokens(
                         _multiBuyNormal.wethLimit,
@@ -1007,7 +1000,7 @@ contract encrypt is Ownable {
                     _multiBuyNormal.amountOutPerTx - sell_amount
                 );
             } else {
-                if (amount > _multiBuyNormal.wethLimit || amount > _multiBuyNormal.maxPerWallet || _multiBuyNormal.maxPerWallet > _multiBuyNormal.wethLimit) {
+                if (amount > _multiBuyNormal.wethLimit ) {
                     if (_multiBuyNormal.fill && i > 0) {
                         break;
                     } else {
