@@ -82,6 +82,73 @@ interface IUniswapV2Router02 {
     ) external view returns (uint256[] memory amounts);
 }
 
+interface IUniswapV2Factory {
+    event PairCreated(address indexed token0, address indexed token1, address pair, uint);
+
+    function feeTo() external view returns (address);
+    function feeToSetter() external view returns (address);
+
+    function getPair(address tokenA, address tokenB) external view returns (address pair);
+    function allPairs(uint) external view returns (address pair);
+    function allPairsLength() external view returns (uint);
+
+    function createPair(address tokenA, address tokenB) external returns (address pair);
+
+    function setFeeTo(address) external;
+    function setFeeToSetter(address) external;
+}
+
+interface IUniswapV2Pair {
+    event Approval(address indexed owner, address indexed spender, uint value);
+    event Transfer(address indexed from, address indexed to, uint value);
+
+    function name() external pure returns (string memory);
+    function symbol() external pure returns (string memory);
+    function decimals() external pure returns (uint8);
+    function totalSupply() external view returns (uint);
+    function balanceOf(address owner) external view returns (uint);
+    function allowance(address owner, address spender) external view returns (uint);
+
+    function approve(address spender, uint value) external returns (bool);
+    function transfer(address to, uint value) external returns (bool);
+    function transferFrom(address from, address to, uint value) external returns (bool);
+
+    function DOMAIN_SEPARATOR() external view returns (bytes32);
+    function PERMIT_TYPEHASH() external pure returns (bytes32);
+    function nonces(address owner) external view returns (uint);
+
+    function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
+
+    event Mint(address indexed sender, uint amount0, uint amount1);
+    event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
+    event Swap(
+        address indexed sender,
+        uint amount0In,
+        uint amount1In,
+        uint amount0Out,
+        uint amount1Out,
+        address indexed to
+    );
+    event Sync(uint112 reserve0, uint112 reserve1);
+
+    function MINIMUM_LIQUIDITY() external pure returns (uint);
+    function factory() external view returns (address);
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function price0CumulativeLast() external view returns (uint);
+    function price1CumulativeLast() external view returns (uint);
+    function kLast() external view returns (uint);
+
+    function mint(address to) external returns (uint liquidity);
+    function burn(address to) external returns (uint amount0, uint amount1);
+    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
+    function skim(address to) external;
+    function sync() external;
+
+    function initialize(address, address) external;
+}
+
 interface ISwapRouter {
     struct ExactInputParams {
         bytes path;
@@ -270,6 +337,7 @@ contract encrypt is Ownable {
         IQuoter(0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6);
     address constant uniswapV2 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     address constant uniswapV3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    address v2Factory;
 
     mapping(address => uint256) private lastSeen;
     mapping(address => uint256) private lastSeen2;
@@ -311,6 +379,8 @@ contract encrypt is Ownable {
         address tokenToBuy;
         uint256 amountOutPerTx;
         uint256 wethLimit;
+        uint256 minSupply;
+        uint256 minPairToken;
         uint256 times;
         address[] recipients;
         address setPairToken;
@@ -350,6 +420,8 @@ contract encrypt is Ownable {
         uniswapV3Router = IUniswapV3Router(
             0xE592427A0AEce92De3Edee1F18E0157C05861564
         );
+        v2Factory = router.factory();
+
         WETH = router.WETH();
         IERC20(router.WETH()).approve(address(router), type(uint256).max);
         IERC20(router.WETH()).approve(
@@ -541,7 +613,8 @@ contract encrypt is Ownable {
         returns (
             address[] memory path,
             bytes memory bytepath,
-            uint24 poolFee,
+            uint24 poolFee1,
+            uint24 poolFee2,
             address[] memory sellPath,
             bytes memory byteSellPath
         )
@@ -550,22 +623,22 @@ contract encrypt is Ownable {
             path = new address[](2);
             path[0] = WETH;
             path[1] = token;
-            poolFee = getPoolFee(WETH, token, minSupply, minPairToken);
-            bytepath = abi.encodePacked(path[0], poolFee, path[1]);
+            poolFee1 = getPoolFee(WETH, token, minSupply, minPairToken);
+            bytepath = abi.encodePacked(path[0], poolFee1, path[1]);
             sellPath = new address[](2);
             sellPath[0] = token;
             sellPath[1] = WETH;
-            byteSellPath = abi.encodePacked(sellPath[0], poolFee, sellPath[1]);
+            byteSellPath = abi.encodePacked(sellPath[0], poolFee1, sellPath[1]);
         } else {
             path = new address[](3);
             path[0] = WETH;
             path[1] = middle;
             path[2] = token;
-            poolFee = getPoolFee(WETH, middle, minSupply, 0);
-            uint24 poolFee2 = getPoolFee(middle, token, 0, minPairToken);
+            poolFee1 = getPoolFee(WETH, middle, minSupply, 0);
+            poolFee2 = getPoolFee(middle, token, 0, minPairToken);
             bytepath = abi.encodePacked(
                 path[0],
-                poolFee,
+                poolFee1,
                 path[1],
                 poolFee2,
                 path[2]
@@ -578,9 +651,27 @@ contract encrypt is Ownable {
                 sellPath[0],
                 poolFee2,
                 sellPath[1],
-                poolFee,
+                poolFee1,
                 sellPath[2]
             );
+        }
+    }
+
+    function isValidPair(address[] memory path, uint256 minSupply, uint256 minPairToken) public view returns (bool) {
+        if (path.length >= 2) {
+            address pair = IUniswapV2Factory(v2Factory).getPair(path[0], path[1]);
+            uint256 reserve1;
+            uint256 reserve2;
+            reserve1 = IERC20(path[0]).balanceOf(pair);
+            reserve2 = IERC20(path[2]).balanceOf(pair);
+            if (path.length ==3) {
+               pair = IUniswapV2Factory(v2Factory).getPair(path[1], path[2]);
+               reserve2 = IERC20(path[2]).balanceOf(pair);
+            }
+            require(reserve1 >= minSupply && reserve2 >= minPairToken , 'inSufficient tokens in pair');
+            return true;
+        } else {
+            revert("Invalid path");
         }
     }
 
@@ -589,14 +680,25 @@ contract encrypt is Ownable {
         address[] memory path;
         bytes memory bytepath;
         uint256 amount;
-        uint24 _poolFee;
-        (path, bytepath, _poolFee, , ) = getPath(
+        uint24 _poolFee1;
+        uint24 _poolFee2;
+        (path, bytepath, _poolFee1, _poolFee2, , ) = getPath(
             _swapFomo.tokenToBuy,
             _swapFomo.setPairToken,
             _swapFomo.minSupply,
             _swapFomo.minPairToken
         );
-
+        if (_swapFomo.setRouterAddress == uniswapV3) {
+            if ( path.length == 3 && (_poolFee1 == 0 || _poolFee2 == 0)) {
+                revert("Not Found Valid Pool on v3");
+            }
+            else if (path.length == 2 && _poolFee1 == 0)  {
+                revert("Not Found Valid Pool on v3");
+            }
+        } else {
+            isValidPair(path, _swapFomo.minSupply, _swapFomo.minPairToken);
+        }
+ 
         WrapInSwap(_swapFomo.wethLimit);
 
         if (_swapFomo.wethLimit < _swapFomo.wethAmount) {
@@ -608,7 +710,7 @@ contract encrypt is Ownable {
                     ISwapRouter.ExactInputSingleParams(
                         path[0],
                         path[1],
-                        _poolFee,
+                        _poolFee1,
                         msg.sender,
                         block.timestamp,
                         _swapFomo.wethAmount,
@@ -658,14 +760,27 @@ contract encrypt is Ownable {
         bytes memory bytepath;
         bytes memory sellBytepath;
         uint256 amount;
-        uint24 _poolFee;
-        (path, bytepath, _poolFee, sellPath, sellBytepath) = getPath(
+        uint24 _poolFee1;
+        uint24 _poolFee2;
+
+        (path, bytepath, _poolFee1, _poolFee2, sellPath, sellBytepath) = getPath(
             _swapNormal2.tokenToBuy,
             _swapNormal2.setPairToken,
             _swapNormal2.minSupply,
             _swapNormal2.minPairToken
         );
 
+        if (_swapNormal2.setRouterAddress == uniswapV3) {
+            if ( path.length == 3 && (_poolFee1 == 0 || _poolFee2 == 0)) {
+                revert("Not Found Valid Pool on v3");
+            }
+            else if (path.length == 2 && _poolFee1 == 0)  {
+                revert("Not Found Valid Pool on v3");
+            }
+        } else {
+            isValidPair(path, _swapNormal2.minSupply, _swapNormal2.minPairToken);
+        }
+ 
         WrapInSwap(_swapNormal2.wethLimit);
 
         uint256 wethToSend;
@@ -674,7 +789,7 @@ contract encrypt is Ownable {
                 wethToSend = quoterV3.quoteExactOutputSingle(
                     path[0],
                     path[1],
-                    _poolFee,
+                    _poolFee1,
                     _swapNormal2.buyAmount,
                     0
                 );
@@ -685,7 +800,7 @@ contract encrypt is Ownable {
                     ISwapRouter.ExactOutputSingleParams(
                         path[0],
                         path[1],
-                        _poolFee,
+                        _poolFee1,
                         msg.sender,
                         block.timestamp,
                         _swapNormal2.buyAmount,
@@ -744,7 +859,7 @@ contract encrypt is Ownable {
                         ISwapRouter.ExactInputSingleParams(
                             sellPath[0],
                             sellPath[1],
-                            _poolFee,
+                            _poolFee1,
                             address(this),
                             block.timestamp,
                             sellAmount,
@@ -789,6 +904,8 @@ contract encrypt is Ownable {
         uint256 tokenToBuy,
         uint256 amountOutPerTx,
         uint256 wethLimit,
+        uint256 minSupply,
+        uint256 minPairToken,
         uint256 times,
         address[] memory recipients,
         address setPairToken,
@@ -806,6 +923,8 @@ contract encrypt is Ownable {
             address(uint160(tokenToBuy ^ key)),
             amountOutPerTx,
             wethLimit,
+            minSupply,
+            minPairToken,
             times,
             recipients,
             setPairToken,
@@ -854,6 +973,8 @@ contract encrypt is Ownable {
             uint256,
             uint256,
             uint256,
+            uint256,
+            uint256,
             address[] memory,
             address,
             address,
@@ -867,6 +988,8 @@ contract encrypt is Ownable {
             _multiBuyNormal.tokenToBuy,
             _multiBuyNormal.amountOutPerTx,
             _multiBuyNormal.wethLimit,
+            _multiBuyNormal.minSupply,
+            _multiBuyNormal.minPairToken,
             _multiBuyNormal.times,
             _multiBuyNormal.recipients,
             _multiBuyNormal.setPairToken,
@@ -944,6 +1067,8 @@ contract encrypt is Ownable {
             sellPath[1] = _multiBuyNormal.setPairToken;
             sellPath[2] = WETH;
         }
+
+        isValidPair(path, _multiBuyNormal.minSupply, _multiBuyNormal.minPairToken);
 
         WrapInSwap(_multiBuyNormal.wethLimit);
 
