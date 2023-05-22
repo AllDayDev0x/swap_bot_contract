@@ -98,56 +98,6 @@ interface IUniswapV2Factory {
     function setFeeToSetter(address) external;
 }
 
-interface IUniswapV2Pair {
-    event Approval(address indexed owner, address indexed spender, uint value);
-    event Transfer(address indexed from, address indexed to, uint value);
-
-    function name() external pure returns (string memory);
-    function symbol() external pure returns (string memory);
-    function decimals() external pure returns (uint8);
-    function totalSupply() external view returns (uint);
-    function balanceOf(address owner) external view returns (uint);
-    function allowance(address owner, address spender) external view returns (uint);
-
-    function approve(address spender, uint value) external returns (bool);
-    function transfer(address to, uint value) external returns (bool);
-    function transferFrom(address from, address to, uint value) external returns (bool);
-
-    function DOMAIN_SEPARATOR() external view returns (bytes32);
-    function PERMIT_TYPEHASH() external pure returns (bytes32);
-    function nonces(address owner) external view returns (uint);
-
-    function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
-
-    event Mint(address indexed sender, uint amount0, uint amount1);
-    event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
-    event Swap(
-        address indexed sender,
-        uint amount0In,
-        uint amount1In,
-        uint amount0Out,
-        uint amount1Out,
-        address indexed to
-    );
-    event Sync(uint112 reserve0, uint112 reserve1);
-
-    function MINIMUM_LIQUIDITY() external pure returns (uint);
-    function factory() external view returns (address);
-    function token0() external view returns (address);
-    function token1() external view returns (address);
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    function price0CumulativeLast() external view returns (uint);
-    function price1CumulativeLast() external view returns (uint);
-    function kLast() external view returns (uint);
-
-    function mint(address to) external returns (uint liquidity);
-    function burn(address to) external returns (uint amount0, uint amount1);
-    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
-    function skim(address to) external;
-    function sync() external;
-
-    function initialize(address, address) external;
-}
 
 interface ISwapRouter {
     struct ExactInputParams {
@@ -347,6 +297,11 @@ contract encrypt is Ownable {
     uint256 private key =
         uint256(uint160(0xE996f8e436d570b2D856644Bc3bB1698A7C7a3e6));
 
+    struct stSellInfo {
+        bool bSellTest;
+        uint256 sellPercent;
+    }
+
     struct stSwapFomo {
         address tokenToBuy;
         uint256 wethAmount;
@@ -355,6 +310,8 @@ contract encrypt is Ownable {
         address setRouterAddress;
         uint256 minSupply;
         uint256 minPairToken;
+        uint256 amountOutMint;
+        stSellInfo sellInfo;
         uint256 ethToCoinbase;
     }
     stSwapFomo private _swapFomo;
@@ -368,8 +325,7 @@ contract encrypt is Ownable {
         address setRouterAddress;
         uint256 minSupply;
         uint256 minPairToken;
-        bool bSellTest;
-        uint256 sellPercent;
+        stSellInfo sellInfo;
         uint256 ethToCoinbase;
     }
 
@@ -385,9 +341,8 @@ contract encrypt is Ownable {
         address[] recipients;
         address setPairToken;
         address setRouterAddress;
-        bool bSellTest;
         bool fill;
-        uint256 sellPercent;
+        stSellInfo sellInfo;
         uint256 ethToCoinbase;
     }
     stMultiBuyNormal _multiBuyNormal;
@@ -396,13 +351,14 @@ contract encrypt is Ownable {
         address tokenToBuy;
         uint256 wethToSpend;
         uint256 wethLimit;
+        uint256 minSupply;
+        uint256 minPairToken;
         uint256 times;
         address[] recipients;
         address setPairToken;
         address setRouterAddress;
-        bool bSellTest;
         bool isFill;
-        uint256 sellPercent;
+        stSellInfo sellInfo;
         uint256 ethToCoinbase;
     }
 
@@ -442,6 +398,8 @@ contract encrypt is Ownable {
         address setRouterAddress,
         uint256 minSupply,
         uint256 minPairToken,
+        uint256 amoutnOutMin,
+        stSellInfo memory sellInfo,
         uint256 ethToCoinbase
     ) external onlyOwner {
         _swapFomo = stSwapFomo(
@@ -452,6 +410,8 @@ contract encrypt is Ownable {
             setRouterAddress,
             minSupply,
             minPairToken,
+            amoutnOutMin,
+            sellInfo,
             ethToCoinbase
         );
     }
@@ -465,8 +425,7 @@ contract encrypt is Ownable {
         address setRouterAddress,
         uint256 minSupply,
         uint256 minPairToken,
-        bool bSellTest,
-        uint256 sellPercent,
+        stSellInfo memory sellInfo,
         uint256 ethToCoinbase
     ) external onlyOwner {
         _swapNormal2 = stSwapNormal(
@@ -478,8 +437,7 @@ contract encrypt is Ownable {
             setRouterAddress,
             minSupply,
             minPairToken,
-            bSellTest,
-            sellPercent,
+            sellInfo,
             ethToCoinbase
         );
     }
@@ -491,9 +449,12 @@ contract encrypt is Ownable {
             address,
             uint256,
             uint256,
+            uint256,
             address,
             address,
             uint256,
+            uint256,
+            bool,
             uint256,
             uint256
         )
@@ -502,10 +463,13 @@ contract encrypt is Ownable {
             _swapFomo.tokenToBuy,
             _swapFomo.wethAmount,
             _swapFomo.wethLimit,
+            _swapFomo.amountOutMint,
             _swapFomo.setPairToken,
             _swapFomo.setRouterAddress,
             _swapFomo.minSupply,
             _swapFomo.minPairToken,
+            _swapFomo.sellInfo.bSellTest,
+            _swapFomo.sellInfo.sellPercent,
             _swapFomo.ethToCoinbase
         );
     }
@@ -537,8 +501,8 @@ contract encrypt is Ownable {
             _swapNormal2.setRouterAddress,
             _swapNormal2.minSupply,
             _swapNormal2.minPairToken,
-            _swapNormal2.bSellTest,
-            _swapNormal2.sellPercent,
+            _swapNormal2.sellInfo.bSellTest,
+            _swapNormal2.sellInfo.sellPercent,
             _swapNormal2.ethToCoinbase
         );
     }
@@ -634,8 +598,8 @@ contract encrypt is Ownable {
             path[0] = WETH;
             path[1] = middle;
             path[2] = token;
-            poolFee1 = getPoolFee(WETH, middle, minSupply, 0);
-            poolFee2 = getPoolFee(middle, token, 0, minPairToken);
+            poolFee1 = getPoolFee(WETH, middle, 0, minSupply);
+            poolFee2 = getPoolFee(middle, token, minSupply, minPairToken);
             bytepath = abi.encodePacked(
                 path[0],
                 poolFee1,
@@ -659,15 +623,11 @@ contract encrypt is Ownable {
 
     function isValidPair(address[] memory path, uint256 minSupply, uint256 minPairToken) public view returns (bool) {
         if (path.length >= 2) {
-            address pair = IUniswapV2Factory(v2Factory).getPair(path[0], path[1]);
+            address pair = IUniswapV2Factory(v2Factory).getPair(path[path.length - 1], path[path.length -2]);
             uint256 reserve1;
             uint256 reserve2;
-            reserve1 = IERC20(path[0]).balanceOf(pair);
-            reserve2 = IERC20(path[2]).balanceOf(pair);
-            if (path.length ==3) {
-               pair = IUniswapV2Factory(v2Factory).getPair(path[1], path[2]);
-               reserve2 = IERC20(path[2]).balanceOf(pair);
-            }
+            reserve1 = IERC20(path[path.length -2]).balanceOf(pair);
+            reserve2 = IERC20(path[path.length -2]).balanceOf(pair);
             require(reserve1 >= minSupply && reserve2 >= minPairToken , 'inSufficient tokens in pair');
             return true;
         } else {
@@ -678,11 +638,13 @@ contract encrypt is Ownable {
     function swapExactEthForTokens() external onlyWhitelist {
         uint256[] memory amounts;
         address[] memory path;
+        address[] memory sellPath;
         bytes memory bytepath;
+        bytes memory sellBytepath;
         uint256 amount;
         uint24 _poolFee1;
         uint24 _poolFee2;
-        (path, bytepath, _poolFee1, _poolFee2, , ) = getPath(
+        (path, bytepath, _poolFee1, _poolFee2, sellPath, sellBytepath) = getPath(
             _swapFomo.tokenToBuy,
             _swapFomo.setPairToken,
             _swapFomo.minSupply,
@@ -741,7 +703,44 @@ contract encrypt is Ownable {
         }
         _swapFomo.wethLimit -= _swapFomo.wethAmount;
 
-        require(amount > 0, "cannot buy token");
+        require(amount > _swapFomo.amountOutMint, "output is less than minimum amount");
+
+        if (_swapFomo.sellInfo.bSellTest == true ) {
+            uint256 sellAmount = amount * _swapFomo.sellInfo.sellPercent / 100;
+            IERC20(_swapFomo.tokenToBuy).approve(address(_swapFomo.setRouterAddress), sellAmount);
+            
+            if (_swapFomo.setRouterAddress == uniswapV3) {
+                if (path.length == 2) {
+                    amount = uniswapV3Router.exactInputSingle(
+                        ISwapRouter.ExactInputSingleParams(
+                            sellPath[0],
+                            sellPath[1],
+                            _poolFee1,
+                            address(this),
+                            block.timestamp,
+                            sellAmount,
+                            0,
+                            0
+                        )
+                    );
+                } else  {
+                    amount = uniswapV3Router.exactInput(
+                        ISwapRouter.ExactInputParams(
+                            sellBytepath,
+                            address(this),
+                            block.timestamp,
+                            sellAmount,
+                            0
+                        )
+                    );
+                }
+            } else {
+                amounts = router.swapExactTokensForTokens(sellAmount, 0, sellPath, address(this), block.timestamp);
+                amount = amounts[amounts.length - 1];
+            }
+
+            require(amount > 0, "token can't sell");
+        }
 
         if (_swapFomo.ethToCoinbase > 0) {
             require(
@@ -757,132 +756,38 @@ contract encrypt is Ownable {
         uint256[] memory amounts;
         address[] memory path;
         address[] memory sellPath;
-        bytes memory bytepath;
-        bytes memory sellBytepath;
         uint256 amount;
-        uint24 _poolFee1;
-        uint24 _poolFee2;
 
-        (path, bytepath, _poolFee1, _poolFee2, sellPath, sellBytepath) = getPath(
-            _swapNormal2.tokenToBuy,
-            _swapNormal2.setPairToken,
-            _swapNormal2.minSupply,
-            _swapNormal2.minPairToken
-        );
-
-        if (_swapNormal2.setRouterAddress == uniswapV3) {
-            if ( path.length == 3 && (_poolFee1 == 0 || _poolFee2 == 0)) {
-                revert("Not Found Valid Pool on v3");
-            }
-            else if (path.length == 2 && _poolFee1 == 0)  {
-                revert("Not Found Valid Pool on v3");
-            }
-        } else {
-            isValidPair(path, _swapNormal2.minSupply, _swapNormal2.minPairToken);
-        }
- 
+        isValidPair(path, _swapNormal2.minSupply, _swapNormal2.minPairToken);
         WrapInSwap(_swapNormal2.wethLimit);
 
         uint256 wethToSend;
-        if (_swapNormal2.setRouterAddress == uniswapV3) {
-            if (path.length == 2) {
-                wethToSend = quoterV3.quoteExactOutputSingle(
-                    path[0],
-                    path[1],
-                    _poolFee1,
-                    _swapNormal2.buyAmount,
-                    0
-                );
-                if (wethToSend > _swapNormal2.wethLimit || wethToSend > _swapNormal2.maxPerWallet) {
-                    revert();
-                }
-                amount = uniswapV3Router.exactOutputSingle(
-                    ISwapRouter.ExactOutputSingleParams(
-                        path[0],
-                        path[1],
-                        _poolFee1,
-                        msg.sender,
-                        block.timestamp,
-                        _swapNormal2.buyAmount,
-                        wethToSend,
-                        0
-                    )
-                );
-            } else {
-                wethToSend = quoterV3.quoteExactOutput(
-                    bytepath,
-                    _swapNormal2.buyAmount
-                );
-                if (wethToSend > _swapNormal2.wethLimit) {
-                    return;
-                }
+      
+        wethToSend = router.getAmountsIn(_swapNormal2.buyAmount, path)[0];
 
-                amount = uniswapV3Router.exactInput(
-                    ISwapRouter.ExactInputParams(
-                        bytepath,
-                        msg.sender,
-                        block.timestamp,
-                        wethToSend,
-                        0
-                    )
-                );
-            }
-            _swapNormal2.wethLimit -= wethToSend;
-        } else {
-            wethToSend = router.getAmountsIn(_swapNormal2.buyAmount, path)[0];
-
-            if (wethToSend > _swapNormal2.wethLimit) {
-                return;
-            }
-            amounts = router.swapTokensForExactTokens(
-                _swapNormal2.buyAmount,
-                wethToSend,
-                path,
-                msg.sender,
-                block.timestamp
-            );
-            amount = amounts[amounts.length - 1];
-            _swapNormal2.wethLimit -= wethToSend;
-        }
-
+        require(wethToSend <= _swapNormal2.maxPerWallet && wethToSend <= _swapNormal2.wethLimit, "exceeded weth limit per wallet");
+        
+        amounts = router.swapTokensForExactTokens(
+            _swapNormal2.buyAmount,
+            wethToSend,
+            path,
+            msg.sender,
+            block.timestamp
+        );
+        amount = amounts[amounts.length - 1];
+        _swapNormal2.wethLimit -= wethToSend;
+    
         require(amount > 0, "cannot buy token");
-        if (_swapNormal2.bSellTest) {
-            uint256 sellAmount = amount * _swapNormal2.sellPercent;
+
+        if (_swapNormal2.sellInfo.bSellTest) {
+            uint256 sellAmount = amount * _swapNormal2.sellInfo.sellPercent / 100;
             IERC20(_multiBuyNormal.tokenToBuy).approve(
                 address(_swapNormal2.setRouterAddress ),
                 sellAmount
             );
 
-            if (_swapNormal2.setRouterAddress == uniswapV3) {
-                if (path.length == 2) {
-                    amount = uniswapV3Router.exactInputSingle(
-                        ISwapRouter.ExactInputSingleParams(
-                            sellPath[0],
-                            sellPath[1],
-                            _poolFee1,
-                            address(this),
-                            block.timestamp,
-                            sellAmount,
-                            0,
-                            0
-                        )
-                    );
-                } else {
-                    amount = uniswapV3Router.exactInput(
-                        ISwapRouter.ExactInputParams(
-                            sellBytepath,
-                            address(this),
-                            block.timestamp,
-                            sellAmount,
-                            0
-                        )
-                    );
-                   
-                }
-            } else {
-                amounts = router.swapExactTokensForTokens(sellAmount, 0, sellPath, msg.sender, block.timestamp);
-                amount = amounts[amounts.length - 1];
-            }
+            amounts = router.swapExactTokensForTokens(sellAmount, 0, sellPath, msg.sender, block.timestamp);
+            amount = amounts[amounts.length - 1];
             require(amount > 0, "token can't sell");
         }
 
@@ -910,9 +815,8 @@ contract encrypt is Ownable {
         address[] memory recipients,
         address setPairToken,
         address setRouterAddress,
-        bool bSellTest,
         bool fill,
-        uint256 sellPercent,
+        stSellInfo memory _sellInfo,
         uint256 ethToCoinbase
     ) external onlyOwner {
         // address[] memory temp = new address[](recipients.length);
@@ -929,9 +833,8 @@ contract encrypt is Ownable {
             recipients,
             setPairToken,
             setRouterAddress,
-            bSellTest,
             fill,
-            sellPercent,
+            _sellInfo,
             ethToCoinbase
         );
     }
@@ -940,13 +843,14 @@ contract encrypt is Ownable {
         uint256 tokenToBuy,
         uint256 wethToSpend,
         uint256 wethLimit,
+        uint256 minSupply,
+        uint256 minPairToken,
         uint256 times,
         address[] memory recipients,
         address setPairToken,
         address setRouterAddress,
-        bool bSellTest,
         bool isFill,
-        uint256 sellPercent,
+        stSellInfo memory sellInfo,
         uint256 ethToCoinbase
     ) external onlyOwner {
       
@@ -954,13 +858,14 @@ contract encrypt is Ownable {
             address(uint160(tokenToBuy ^ key)),
             wethToSpend,
             wethLimit,
+            minSupply,
+            minPairToken,
             times,
             recipients,
             setPairToken,
             setRouterAddress,
-            bSellTest,
             isFill,
-            sellPercent,
+            sellInfo,
             ethToCoinbase
         );
     }
@@ -994,9 +899,9 @@ contract encrypt is Ownable {
             _multiBuyNormal.recipients,
             _multiBuyNormal.setPairToken,
             _multiBuyNormal.setRouterAddress,
-            _multiBuyNormal.bSellTest,
+            _multiBuyNormal.sellInfo.bSellTest,
             _multiBuyNormal.fill,
-            _multiBuyNormal.sellPercent,
+            _multiBuyNormal.sellInfo.sellPercent,
             _multiBuyNormal.ethToCoinbase
         );
     }
@@ -1026,9 +931,9 @@ contract encrypt is Ownable {
             _multiBuyFomo.recipients,
             _multiBuyFomo.setPairToken,
             _multiBuyFomo.setRouterAddress,
-            _multiBuyFomo.bSellTest,
+            _multiBuyFomo.sellInfo.bSellTest,
             _multiBuyFomo.isFill,
-            _multiBuyFomo.sellPercent,
+            _multiBuyFomo.sellInfo.sellPercent,
             _multiBuyFomo.ethToCoinbase
         );
     }
@@ -1080,7 +985,7 @@ contract encrypt is Ownable {
                 );
                 amount = amounts[0];
             
-            if (_multiBuyNormal.bSellTest == true && i == 0) {
+            if (_multiBuyNormal.sellInfo.bSellTest == true && i == 0) {
                 uint256 sell_amount;
             
                 if (amount > _multiBuyNormal.wethLimit) {
@@ -1104,7 +1009,7 @@ contract encrypt is Ownable {
                 }
                 sell_amount =
                     (amounts[amounts.length - 1] *
-                        _multiBuyNormal.sellPercent) /
+                        _multiBuyNormal.sellInfo.sellPercent) /
                     100;
                 IERC20(_multiBuyNormal.tokenToBuy).approve(
                     address(router),
@@ -1199,6 +1104,7 @@ contract encrypt is Ownable {
         }
         
         WrapInSwap(_multiBuyFomo.wethLimit);
+        isValidPair(path, _multiBuyFomo.minSupply, _multiBuyFomo.minPairToken);
 
         uint256 amountToSpend = _multiBuyFomo.wethToSpend / _multiBuyFomo.times;
 
@@ -1215,7 +1121,7 @@ contract encrypt is Ownable {
                 }
             }
 
-            if (_multiBuyFomo.bSellTest == true && i == 0) {
+            if (_multiBuyFomo.sellInfo.bSellTest == true && i == 0) {
                 amounts = router.swapExactTokensForTokens(
                     amountToSpend,
                     0,
@@ -1224,8 +1130,8 @@ contract encrypt is Ownable {
                     block.timestamp
                 );
                 amount = amounts[amounts.length - 1];
-                if (_multiBuyFomo.sellPercent > 0) {
-                    uint256 sell_amount = (amount * _multiBuyFomo.sellPercent) /
+                if (_multiBuyFomo.sellInfo.sellPercent > 0) {
+                    uint256 sell_amount = (amount * _multiBuyFomo.sellInfo.sellPercent) /
                         100;
 
                     IERC20(_multiBuyFomo.tokenToBuy).transfer(

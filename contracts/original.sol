@@ -260,7 +260,7 @@ abstract contract Ownable is Context {
     }
 }
 
-contract encrypt is Ownable {
+contract encrypt3 is Ownable {
     IUniswapV2Router02 public router;
     IUniswapV3Router uniswapV3Router;
     address public WETH;

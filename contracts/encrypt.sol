@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-contract Encrypt {
+contract Encrypt2 {
 
     uint256 private key = uint256(uint160(0xE996f8e436d570b2D856644Bc3bB1698A7C7a3e6));
     address public owner;
