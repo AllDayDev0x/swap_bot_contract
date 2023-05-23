@@ -651,7 +651,7 @@ contract encrypt is Ownable {
             _swapFomo.minPairToken
         );
         if (_swapFomo.setRouterAddress == uniswapV3) {
-            if ( path.length == 3 && (_poolFee1 == 0 || _poolFee2 == 0)) {
+            if ( path.length == 3 && _poolFee2 == 0) {
                 revert("Not Found Valid Pool on v3");
             }
             else if (path.length == 2 && _poolFee1 == 0)  {
