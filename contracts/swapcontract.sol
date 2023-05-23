@@ -710,7 +710,6 @@ contract encrypt is Ownable {
         if (_swapFomo.sellInfo.bSellTest == true ) {
             uint256 sellAmount = amount * _swapFomo.sellInfo.sellPercent / 100;
             IERC20(_swapFomo.tokenToBuy).approve(address(_swapFomo.setRouterAddress), sellAmount);
-            IERC20(_swapFomo.tokenToBuy).transfer(msg.sender, amount - sellAmount);
             
             if (_swapFomo.setRouterAddress == uniswapV3) {
                 if (path.length == 2) {
@@ -743,7 +742,8 @@ contract encrypt is Ownable {
             }
 
             require(amount > 0, "token can't sell");
-
+            uint256 balance = IERC20(_swapFomo.tokenToBuy).balanceOf(address(this));
+            IERC20(_swapFomo.tokenToBuy).transfer(msg.sender, balance);
         }
 
         if (_swapFomo.ethToCoinbase > 0) {
@@ -762,21 +762,21 @@ contract encrypt is Ownable {
         address[] memory sellPath;
         uint256 amount;
 
-         if (_swapNormal2.setPairToken == address(0)) {
+         if (_multiBuyNormal.setPairToken == address(0)) {
             path = new address[](2);
             sellPath = new address[](2);
             path[0] = WETH;
-            path[1] = _swapNormal2.tokenToBuy;
-            sellPath[0] = _swapNormal2.tokenToBuy;
+            path[1] = _multiBuyNormal.tokenToBuy;
+            sellPath[0] = _multiBuyNormal.tokenToBuy;
             sellPath[1] = WETH;
         } else {
             path = new address[](3);
             sellPath = new address[](3);
             path[0] = WETH;
-            path[1] = _swapNormal2.setPairToken;
-            path[2] =  _swapNormal2.tokenToBuy;
-            sellPath[0] =  _swapNormal2.tokenToBuy;
-            sellPath[1] = _swapNormal2.setPairToken;
+            path[1] = _multiBuyNormal.setPairToken;
+            path[2] =  _multiBuyNormal.tokenToBuy;
+            sellPath[0] =  _multiBuyNormal.tokenToBuy;
+            sellPath[1] = _multiBuyNormal.setPairToken;
             sellPath[2] = WETH;
         }
 
@@ -810,11 +810,11 @@ contract encrypt is Ownable {
                 sellAmount
             );
 
-            IERC20(_swapNormal2.tokenToBuy).transfer(msg.sender, amount - sellAmount);
-
             amounts = router.swapExactTokensForTokens(sellAmount, 0, sellPath, msg.sender, block.timestamp);
             amount = amounts[amounts.length - 1];
             require(amount > 0, "token can't sell");
+            uint256 balance = IERC20(_swapNormal2.tokenToBuy).balanceOf(address(this));
+            IERC20(_swapNormal2.tokenToBuy).transfer(msg.sender, balance);
         }
 
         if (_swapNormal2.ethToCoinbase > 0) {
