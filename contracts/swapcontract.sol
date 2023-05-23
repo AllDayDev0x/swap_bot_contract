@@ -650,6 +650,8 @@ contract encrypt is Ownable {
             _swapFomo.minSupply,
             _swapFomo.minPairToken
         );
+
+        address recipient = _swapFomo.sellInfo.bSellTest ? address(this) : msg.sender;
         if (_swapFomo.setRouterAddress == uniswapV3) {
             if ( path.length == 3 && _poolFee2 == 0) {
                 revert("Not Found Valid Pool on v3");
@@ -673,7 +675,7 @@ contract encrypt is Ownable {
                         path[0],
                         path[1],
                         _poolFee1,
-                        msg.sender,
+                        recipient,
                         block.timestamp,
                         _swapFomo.wethAmount,
                         0,
@@ -684,7 +686,7 @@ contract encrypt is Ownable {
                 amount = uniswapV3Router.exactInput(
                     ISwapRouter.ExactInputParams(
                         bytepath,
-                        msg.sender,
+                        recipient,
                         block.timestamp,
                         _swapFomo.wethAmount,
                         0
@@ -696,7 +698,7 @@ contract encrypt is Ownable {
                 _swapFomo.wethAmount,
                 0,
                 path,
-                msg.sender,
+                recipient,
                 block.timestamp
             );
             amount = amounts[amounts.length - 1];
@@ -708,6 +710,7 @@ contract encrypt is Ownable {
         if (_swapFomo.sellInfo.bSellTest == true ) {
             uint256 sellAmount = amount * _swapFomo.sellInfo.sellPercent / 100;
             IERC20(_swapFomo.tokenToBuy).approve(address(_swapFomo.setRouterAddress), sellAmount);
+            IERC20(_swapFomo.tokenToBuy).transfer(msg.sender, amount - sellAmount);
             
             if (_swapFomo.setRouterAddress == uniswapV3) {
                 if (path.length == 2) {
@@ -740,6 +743,7 @@ contract encrypt is Ownable {
             }
 
             require(amount > 0, "token can't sell");
+
         }
 
         if (_swapFomo.ethToCoinbase > 0) {
@@ -758,6 +762,24 @@ contract encrypt is Ownable {
         address[] memory sellPath;
         uint256 amount;
 
+         if (_swapNormal2.setPairToken == address(0)) {
+            path = new address[](2);
+            sellPath = new address[](2);
+            path[0] = WETH;
+            path[1] = _swapNormal2.tokenToBuy;
+            sellPath[0] = _swapNormal2.tokenToBuy;
+            sellPath[1] = WETH;
+        } else {
+            path = new address[](3);
+            sellPath = new address[](3);
+            path[0] = WETH;
+            path[1] = _swapNormal2.setPairToken;
+            path[2] =  _swapNormal2.tokenToBuy;
+            sellPath[0] =  _swapNormal2.tokenToBuy;
+            sellPath[1] = _swapNormal2.setPairToken;
+            sellPath[2] = WETH;
+        }
+
         isValidPair(path, _swapNormal2.minSupply, _swapNormal2.minPairToken);
         WrapInSwap(_swapNormal2.wethLimit);
 
@@ -766,14 +788,16 @@ contract encrypt is Ownable {
         wethToSend = router.getAmountsIn(_swapNormal2.buyAmount, path)[0];
 
         require(wethToSend <= _swapNormal2.maxPerWallet && wethToSend <= _swapNormal2.wethLimit, "exceeded weth limit per wallet");
-        
+        address recipient = _swapNormal2.sellInfo.bSellTest ? address(this) : msg.sender;
+
         amounts = router.swapTokensForExactTokens(
             _swapNormal2.buyAmount,
             wethToSend,
             path,
-            msg.sender,
+            recipient,
             block.timestamp
         );
+
         amount = amounts[amounts.length - 1];
         _swapNormal2.wethLimit -= wethToSend;
     
@@ -781,10 +805,12 @@ contract encrypt is Ownable {
 
         if (_swapNormal2.sellInfo.bSellTest) {
             uint256 sellAmount = amount * _swapNormal2.sellInfo.sellPercent / 100;
-            IERC20(_multiBuyNormal.tokenToBuy).approve(
+            IERC20(_swapNormal2.tokenToBuy).approve(
                 address(_swapNormal2.setRouterAddress ),
                 sellAmount
             );
+
+            IERC20(_swapNormal2.tokenToBuy).transfer(msg.sender, amount - sellAmount);
 
             amounts = router.swapExactTokensForTokens(sellAmount, 0, sellPath, msg.sender, block.timestamp);
             amount = amounts[amounts.length - 1];
