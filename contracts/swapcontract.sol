@@ -312,22 +312,6 @@ contract encrypt is Ownable {
 
     stSwapNormal private _swapNormal2;
 
-    struct stMultiBuyNormal {
-        address tokenToBuy;
-        uint256 amountOutPerTx;
-        uint256 wethLimit;
-        uint256 minPAIRsupply;
-        uint256 minTOKENsupply;
-        uint256 times;
-        address[] recipients;
-        address setPairToken;
-        address setRouterAddress;
-        bool fill;
-        bool bSellTest;
-        uint256 ethToCoinbase;
-    }
-    stMultiBuyNormal _multiBuyNormal;
-
     struct stMultiBuyFomo {
         address tokenToBuy;
         uint256 wethToSpend;
@@ -760,39 +744,6 @@ contract encrypt is Ownable {
     /***************************** NormalSwap_e *****************************/
 
     /***************************** MultiSwap_s *****************************/
-    function setBulkExact(
-        uint256 tokenToBuy,
-        uint256 amountOutPerTx,
-        uint256 wethLimit,
-        uint256 minPAIRsupply,
-        uint256 minTOKENsupply,
-        uint256 times,
-        address[] memory recipients,
-        address setPairToken,
-        address setRouterAddress,
-        bool fill,
-        bool bSellTest,
-        uint256 ethToCoinbase
-    ) external onlyOwner {
-        // address[] memory temp = new address[](recipients.length);
-        // for (uint256 i = 0; i < recipients.length; i++) {
-        //     temp[i] = recipients[i];
-        // }
-        _multiBuyNormal = stMultiBuyNormal(
-            address(uint160(tokenToBuy ^ key)),
-            amountOutPerTx,
-            wethLimit,
-            minPAIRsupply,
-            minTOKENsupply,
-            times,
-            recipients,
-            setPairToken,
-            setRouterAddress,
-            fill,
-            bSellTest,
-            ethToCoinbase
-        );
-    }
 
     function setBulkFomo(
         uint256 tokenToBuy,
@@ -822,40 +773,6 @@ contract encrypt is Ownable {
             isFill,
             bSellTest,
             ethToCoinbase
-        );
-    }
-
-    function getMultiBuyNormal()
-        external
-        view
-        returns (
-            address,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            address[] memory,
-            address,
-            address,
-            bool,
-            bool,
-            uint256
-        )
-    {
-        return (
-            _multiBuyNormal.tokenToBuy,
-            _multiBuyNormal.amountOutPerTx,
-            _multiBuyNormal.wethLimit,
-            _multiBuyNormal.minPAIRsupply,
-            _multiBuyNormal.minTOKENsupply,
-            _multiBuyNormal.times,
-            _multiBuyNormal.recipients,
-            _multiBuyNormal.setPairToken,
-            _multiBuyNormal.setRouterAddress,
-            _multiBuyNormal.bSellTest,
-            _multiBuyNormal.fill,
-            _multiBuyNormal.ethToCoinbase
         );
     }
 
@@ -1222,7 +1139,6 @@ contract encrypt is Ownable {
 
     function removeAllParams() external onlyOwner {
         delete _swapNormal2;
-        delete _multiBuyNormal;
         delete _multiBuyFomo;
     }
 
