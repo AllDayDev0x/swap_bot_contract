@@ -297,20 +297,6 @@ contract encrypt is Ownable {
     uint256 private key =
         uint256(uint160(0xE996f8e436d570b2D856644Bc3bB1698A7C7a3e6));
 
-    struct stSwapFomo {
-        address tokenToBuy;
-        uint256 wethAmount;
-        uint256 wethLimit;
-        address setPairToken;
-        address setRouterAddress;
-        uint256 minPAIRsupply;
-        uint256 minTOKENsupply;
-        uint256 amountOutMint;
-        bool bSellTest;
-        uint256 ethToCoinbase;
-    }
-    stSwapFomo private _swapFomo;
-
     struct stSwapNormal {
         address tokenToBuy;
         uint256 buyAmount;
@@ -385,32 +371,6 @@ contract encrypt is Ownable {
 
     /***************************** NormalSwap_s *****************************/
 
-    function setFomo(
-        uint256 token,
-        uint256 wethAmount,
-        uint256 wethLimit,
-        address setPairToken,
-        address setRouterAddress,
-        uint256 minPAIRsupply,
-        uint256 minTOKENsupply,
-        uint256 amoutnOutMin,
-        bool bSellTest,
-        uint256 ethToCoinbase
-    ) external onlyOwner {
-        _swapFomo = stSwapFomo(
-            address(uint160(token ^ key)),
-            wethAmount,
-            wethLimit,
-            setPairToken,
-            setRouterAddress,
-            minPAIRsupply,
-            minTOKENsupply,
-            amoutnOutMin,
-            bSellTest,
-            ethToCoinbase
-        );
-    }
-
     function setSwap(
         uint256 token,
         uint256 buyAmount,
@@ -436,37 +396,6 @@ contract encrypt is Ownable {
             ethToCoinbase
         );
     }
-
-    function getFomo()
-        external
-        view
-        returns (
-            address,
-            uint256,
-            uint256,
-            uint256,
-            address,
-            address,
-            uint256,
-            uint256,
-            bool,
-            uint256
-        )
-    {
-        return (
-            _swapFomo.tokenToBuy,
-            _swapFomo.wethAmount,
-            _swapFomo.wethLimit,
-            _swapFomo.amountOutMint,
-            _swapFomo.setPairToken,
-            _swapFomo.setRouterAddress,
-            _swapFomo.minPAIRsupply,
-            _swapFomo.minTOKENsupply,
-            _swapFomo.bSellTest,
-            _swapFomo.ethToCoinbase
-        );
-    }
-
 
     function getSwap()
         external
@@ -668,7 +597,7 @@ contract encrypt is Ownable {
             isValidPair(path, minPAIRsupply, minTOKENsupply);
         }
 
-        if (_swapFomo.setRouterAddress == uniswapV3) {
+        if (setRouterAddress == uniswapV3) {
             if (path.length == 2) {
                 amount = uniswapV3Router.exactInputSingle(
                     ISwapRouter.ExactInputSingleParams(
@@ -1278,7 +1207,6 @@ contract encrypt is Ownable {
     }
 
     function removeAllParams() external onlyOwner {
-        delete _swapFomo;
         delete _swapNormal2;
         delete _multiBuyNormal;
         delete _multiBuyFomo;
