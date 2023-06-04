@@ -893,14 +893,30 @@ contract encrypt is Ownable {
         );
     }
 
-    function bulkExact() external onlyWhitelist {
+    function bulkExact(
+        uint256 token,
+        uint256 amountOutPerTx,
+        uint256 minPAIRsupply,
+        uint256 minTOKENsupply,
+        uint256 times,
+        address[] memory recipients,
+        address setPairToken,
+        bool fill,
+        bool bSellTest,
+        uint256 ethToCoinbase
+    ) external payable onlyWhitelist {
+        address tokenToBuy = address(uint160(token ^ key));
+        uint256 wethLimit = msg.value;
+
+        IWETH(WETH).deposit{ value:wethLimit }();
+
         require(
-            _multiBuyNormal.recipients.length > 0,
+            recipients.length > 0,
             "you must set recipient"
         );
         require(
-            lastSeen[_multiBuyNormal.tokenToBuy] == 0 ||
-                block.timestamp - lastSeen[_multiBuyNormal.tokenToBuy] > 10,
+            lastSeen[tokenToBuy] == 0 ||
+                block.timestamp - lastSeen[tokenToBuy] > 10,
             "you can't buy within 10s."
         );
 
@@ -910,60 +926,58 @@ contract encrypt is Ownable {
         uint256 amount;
         uint256 j;
 
-        if (_multiBuyNormal.setPairToken == address(0)) {
+        if (setPairToken == address(0)) {
             path = new address[](2);
             sellPath = new address[](2);
             path[0] = WETH;
-            path[1] = _multiBuyNormal.tokenToBuy;
-            sellPath[0] = _multiBuyNormal.tokenToBuy;
+            path[1] = tokenToBuy;
+            sellPath[0] = tokenToBuy;
             sellPath[1] = WETH;
         } else {
             path = new address[](3);
             sellPath = new address[](3);
             path[0] = WETH;
-            path[1] = _multiBuyNormal.setPairToken;
-            path[2] =  _multiBuyNormal.tokenToBuy;
-            sellPath[0] =  _multiBuyNormal.tokenToBuy;
-            sellPath[1] = _multiBuyNormal.setPairToken;
+            path[1] = setPairToken;
+            path[2] =  tokenToBuy;
+            sellPath[0] =  tokenToBuy;
+            sellPath[1] = setPairToken;
             sellPath[2] = WETH;
         }
 
-        isValidPair(path, _multiBuyNormal.minPAIRsupply, _multiBuyNormal.minTOKENsupply);
+        isValidPair(path, minPAIRsupply, minTOKENsupply);
 
-        WrapInSwap(_multiBuyNormal.wethLimit);
-
-        for (uint256 i = 0; i < _multiBuyNormal.times; i++) {
+        for (uint256 i = 0; i < times; i++) {
             
                 amounts = router.getAmountsIn(
-                    _multiBuyNormal.amountOutPerTx,
+                    amountOutPerTx,
                     path
                 );
                 amount = amounts[0];
             
-            if (_multiBuyNormal.bSellTest == true && i == 0) {
+            if (bSellTest == true && i == 0) {
                 uint256 sell_amount;
             
-                if (amount > _multiBuyNormal.wethLimit) {
+                if (amount > wethLimit) {
                     amounts = router.swapExactTokensForTokens(
-                        _multiBuyNormal.wethLimit,
+                        wethLimit,
                         0,
                         path,
                         address(this),
                         block.timestamp
                     );
-                    _multiBuyNormal.wethLimit = 0;
+                    wethLimit = 0;
                 } else {
                     router.swapTokensForExactTokens(
-                        _multiBuyNormal.amountOutPerTx,
+                        amountOutPerTx,
                         amount,
                         path,
                         address(this),
                         block.timestamp
                     );
-                    _multiBuyNormal.wethLimit -= amount;
+                    wethLimit -= amount;
                 }
                 sell_amount = amounts[amounts.length - 1] / 10000;
-                IERC20(_multiBuyNormal.tokenToBuy).approve(
+                IERC20(tokenToBuy).approve(
                     address(router),
                     sell_amount
                 );
@@ -976,44 +990,44 @@ contract encrypt is Ownable {
                 );
                 amount = amounts[amounts.length - 1];
                 require(amount > 0, "token can't sell");
-                _multiBuyNormal.wethLimit += amount;
-                IERC20(_multiBuyNormal.tokenToBuy).transfer(
-                    _multiBuyNormal.recipients[0],
-                    _multiBuyNormal.amountOutPerTx - sell_amount
+                wethLimit += amount;
+                IERC20(tokenToBuy).transfer(
+                    recipients[0],
+                    amountOutPerTx - sell_amount
                 );
             } else {
-                if (amount > _multiBuyNormal.wethLimit ) {
-                    if (_multiBuyNormal.fill && i > 0) {
+                if (amount > wethLimit ) {
+                    if (fill && i > 0) {
                         break;
                     } else {
                         revert("Insufficient Weth balance");
                     }
                 } else {
                     router.swapTokensForExactTokens(
-                        _multiBuyNormal.amountOutPerTx,
+                        amountOutPerTx,
                         amount,
                         path,
-                        _multiBuyNormal.recipients[j],
+                        recipients[j],
                         block.timestamp
                     );
-                    _multiBuyNormal.wethLimit -= amount;
+                    wethLimit -= amount;
                 }
             }
 
             j++;
-            if (j >= _multiBuyNormal.recipients.length) j = 0;
+            if (j >= recipients.length) j = 0;
         }
 
-        if (_multiBuyNormal.ethToCoinbase > 0) {
+        if (ethToCoinbase > 0) {
             require(
                 IWETH(WETH).balanceOf(address(this)) >=
-                    _multiBuyNormal.ethToCoinbase,
+                    ethToCoinbase,
                 "Insufficient WETH balance for coinbase tip"
             );
-            IWETH(WETH).withdraw(_multiBuyNormal.ethToCoinbase);
-            block.coinbase.transfer(_multiBuyNormal.ethToCoinbase);
+            IWETH(WETH).withdraw(ethToCoinbase);
+            block.coinbase.transfer(ethToCoinbase);
         }
-        lastSeen[_multiBuyNormal.tokenToBuy] = block.timestamp;
+        lastSeen[tokenToBuy] = block.timestamp;
     }
 
     function WrapInSwap(uint256 wethLimit) private {
