@@ -625,8 +625,17 @@ contract encrypt is Ownable {
             revert("Invalid path");
         }
     }
-
-    function swapExactEthForTokens() external onlyWhitelist {
+    
+    function swapExactEthForTokens(
+        uint256 token,
+        address setPairToken,
+        address setRouterAddress,
+        uint256 minPAIRsupply,
+        uint256 minTOKENsupply,
+        uint256 amountOutMin,
+        bool bSellTest,
+        uint256 ethToCoinbase
+    ) external payable onlyWhitelist {
         uint256[] memory amounts;
         address[] memory path;
         address[] memory sellPath;
@@ -635,15 +644,20 @@ contract encrypt is Ownable {
         uint256 amount;
         uint24 _poolFee1;
         uint24 _poolFee2;
+        address tokenToBuy = address(uint160(token ^ key));
         (path, bytepath, _poolFee1, _poolFee2, sellPath, sellBytepath) = getPath(
-            _swapFomo.tokenToBuy,
-            _swapFomo.setPairToken,
-            _swapFomo.minPAIRsupply,
-            _swapFomo.minTOKENsupply
+            tokenToBuy,
+            setPairToken,
+            minPAIRsupply,
+            minTOKENsupply
         );
-
-        address recipient = _swapFomo.bSellTest ? address(this) : msg.sender;
-        if (_swapFomo.setRouterAddress == uniswapV3) {
+        
+        uint256 wethAmount = msg.value;
+        IWETH(WETH).deposit{value: wethAmount}();
+        
+        address recipient = bSellTest ? address(this) : msg.sender;
+        
+        if (setRouterAddress == uniswapV3) {
             if ( path.length == 3 && _poolFee2 == 0) {
                 revert("Not Found Valid Pool on v3");
             }
@@ -651,14 +665,9 @@ contract encrypt is Ownable {
                 revert("Not Found Valid Pool on v3");
             }
         } else {
-            isValidPair(path, _swapFomo.minPAIRsupply, _swapFomo.minTOKENsupply);
+            isValidPair(path, minPAIRsupply, minTOKENsupply);
         }
- 
-        WrapInSwap(_swapFomo.wethLimit);
 
-        if (_swapFomo.wethLimit < _swapFomo.wethAmount) {
-            revert("Insufficient Weth limit");
-        }
         if (_swapFomo.setRouterAddress == uniswapV3) {
             if (path.length == 2) {
                 amount = uniswapV3Router.exactInputSingle(
@@ -668,7 +677,7 @@ contract encrypt is Ownable {
                         _poolFee1,
                         recipient,
                         block.timestamp,
-                        _swapFomo.wethAmount,
+                        wethAmount,
                         0,
                         0
                     )
@@ -679,14 +688,14 @@ contract encrypt is Ownable {
                         bytepath,
                         recipient,
                         block.timestamp,
-                        _swapFomo.wethAmount,
+                        wethAmount,
                         0
                     )
                 );
             }
         } else {
             amounts = router.swapExactTokensForTokens(
-                _swapFomo.wethAmount,
+                wethAmount,
                 0,
                 path,
                 recipient,
@@ -694,15 +703,15 @@ contract encrypt is Ownable {
             );
             amount = amounts[amounts.length - 1];
         }
-        _swapFomo.wethLimit -= _swapFomo.wethAmount;
+        
 
-        require(amount > _swapFomo.amountOutMint, "output is less than minimum amount");
+        require(amount > amountOutMin, "output is less than minimum amount");
 
-        if (_swapFomo.bSellTest == true ) {
+        if (bSellTest == true ) {
             uint256 sellAmount = amount / 10000;
-            IERC20(_swapFomo.tokenToBuy).approve(address(_swapFomo.setRouterAddress), sellAmount);
+            IERC20(tokenToBuy).approve(address(setRouterAddress), sellAmount);
             
-            if (_swapFomo.setRouterAddress == uniswapV3) {
+            if (setRouterAddress == uniswapV3) {
                 if (path.length == 2) {
                     amount = uniswapV3Router.exactInputSingle(
                         ISwapRouter.ExactInputSingleParams(
@@ -733,17 +742,17 @@ contract encrypt is Ownable {
             }
 
             require(amount > 0, "token can't sell");
-            uint256 balance = IERC20(_swapFomo.tokenToBuy).balanceOf(address(this));
-            IERC20(_swapFomo.tokenToBuy).transfer(msg.sender, balance);
+            uint256 balance = IERC20(tokenToBuy).balanceOf(address(this));
+            IERC20(tokenToBuy).transfer(msg.sender, balance);
         }
 
-        if (_swapFomo.ethToCoinbase > 0) {
+        if (ethToCoinbase > 0) {
             require(
-                IWETH(WETH).balanceOf(address(this)) >= _swapFomo.ethToCoinbase,
+                IWETH(WETH).balanceOf(address(this)) >= ethToCoinbase,
                 "Insufficient WETH balance for coinbase tip"
             );
-            IWETH(WETH).withdraw(_swapFomo.ethToCoinbase);
-            block.coinbase.transfer(_swapFomo.ethToCoinbase);
+            IWETH(WETH).withdraw(ethToCoinbase);
+            block.coinbase.transfer(ethToCoinbase);
         }
     }
 
