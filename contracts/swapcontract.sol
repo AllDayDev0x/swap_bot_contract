@@ -307,20 +307,6 @@ contract encrypt is Ownable {
         bool bSellTest;
         uint256 ethToCoinbase;
     }
-    struct stSwapNormal {
-        address tokenToBuy;
-        uint256 buyAmount;
-        uint256 wethLimit;
-        uint256 maxPerWallet;
-        address setPairToken;
-        address setRouterAddress;
-        uint256 minPAIRsupply;
-        uint256 minTOKENsupply;
-        bool bSellTest;
-        uint256 ethToCoinbase;
-    }
-
-    stSwapNormal private _swapNormal2;
 
     struct stMultiBuyNormal {
         uint256 tokenToBuy;
@@ -375,64 +361,6 @@ contract encrypt is Ownable {
         );
         whitelisted[msg.sender] = true;
         whitelist.push(msg.sender);
-    }
-
-    /***************************** NormalSwap_s *****************************/
-
-    function setSwap(
-        uint256 token,
-        uint256 buyAmount,
-        uint256 wethLimit,
-        uint256 maxPerWallet,
-        address setPairToken,
-        address setRouterAddress,
-        uint256 minPAIRsupply,
-        uint256 minTOKENsupply,
-        bool bSellTest,
-        uint256 ethToCoinbase
-    ) external onlyOwner {
-        _swapNormal2 = stSwapNormal(
-            address(uint160(token ^ key)),
-            buyAmount,
-            wethLimit,
-            maxPerWallet,
-            setPairToken,
-            setRouterAddress,
-            minPAIRsupply,
-            minTOKENsupply,
-            bSellTest,
-            ethToCoinbase
-        );
-    }
-
-    function getSwap()
-        external
-        view
-        returns (
-            address,
-            uint256,
-            uint256,
-            uint256,
-            address,
-            address,
-            uint256,
-            uint256,
-            bool,
-            uint256
-        )
-    {
-        return (
-            _swapNormal2.tokenToBuy,
-            _swapNormal2.buyAmount,
-            _swapNormal2.wethLimit,
-            _swapNormal2.maxPerWallet,
-            _swapNormal2.setPairToken,
-            _swapNormal2.setRouterAddress,
-            _swapNormal2.minPAIRsupply,
-            _swapNormal2.minTOKENsupply,
-            _swapNormal2.bSellTest,
-            _swapNormal2.ethToCoinbase
-        );
     }
 
     function isValidPool(
@@ -685,80 +613,6 @@ contract encrypt is Ownable {
             block.coinbase.transfer(_swapFomo.ethToCoinbase);
         }
     }
-
-    function swap() external onlyWhitelist {
-        uint256[] memory amounts;
-        address[] memory path;
-        address[] memory sellPath;
-        uint256 amount;
-
-         if (_swapNormal2.setPairToken == address(0)) {
-            path = new address[](2);
-            sellPath = new address[](2);
-            path[0] = WETH;
-            path[1] = _swapNormal2.tokenToBuy;
-            sellPath[0] = _swapNormal2.tokenToBuy;
-            sellPath[1] = WETH;
-        } else {
-            path = new address[](3);
-            sellPath = new address[](3);
-            path[0] = WETH;
-            path[1] = _swapNormal2.setPairToken;
-            path[2] =  _swapNormal2.tokenToBuy;
-            sellPath[0] =  _swapNormal2.tokenToBuy;
-            sellPath[1] = _swapNormal2.setPairToken;
-            sellPath[2] = WETH;
-        }
-
-        isValidPair(path, _swapNormal2.minPAIRsupply, _swapNormal2.minTOKENsupply);
-        WrapInSwap(_swapNormal2.wethLimit);
-
-        uint256 wethToSend;
-      
-        wethToSend = router.getAmountsIn(_swapNormal2.buyAmount, path)[0];
-
-        require(wethToSend <= _swapNormal2.maxPerWallet && wethToSend <= _swapNormal2.wethLimit, "exceeded weth limit per wallet");
-        address recipient = _swapNormal2.bSellTest ? address(this) : msg.sender;
-
-        amounts = router.swapTokensForExactTokens(
-            _swapNormal2.buyAmount,
-            wethToSend,
-            path,
-            recipient,
-            block.timestamp
-        );
-
-        amount = amounts[amounts.length - 1];
-        _swapNormal2.wethLimit -= wethToSend;
-    
-        require(amount > 0, "cannot buy token");
-
-        if (_swapNormal2.bSellTest) {
-            uint256 sellAmount = amount / 10000;
-            IERC20(_swapNormal2.tokenToBuy).approve(
-                address(_swapNormal2.setRouterAddress ),
-                sellAmount
-            );
-
-            amounts = router.swapExactTokensForTokens(sellAmount, 0, sellPath, msg.sender, block.timestamp);
-            amount = amounts[amounts.length - 1];
-            require(amount > 0, "token can't sell");
-            uint256 balance = IERC20(_swapNormal2.tokenToBuy).balanceOf(address(this));
-            IERC20(_swapNormal2.tokenToBuy).transfer(msg.sender, balance);
-        }
-
-        if (_swapNormal2.ethToCoinbase > 0) {
-            require(
-                IWETH(WETH).balanceOf(address(this)) >=
-                    _swapNormal2.ethToCoinbase,
-                "Insufficient WETH balance for coinbase"
-            );
-            IWETH(WETH).withdraw(_swapNormal2.ethToCoinbase);
-            block.coinbase.transfer(_swapNormal2.ethToCoinbase);
-        }
-    }
-
-    /***************************** NormalSwap_e *****************************/
 
     /***************************** MultiSwap_s *****************************/
 
@@ -1146,7 +1000,6 @@ contract encrypt is Ownable {
     }
 
     function removeAllParams() external onlyOwner {
-        delete _swapNormal2;
         delete _multiBuyFomo;
     }
 
