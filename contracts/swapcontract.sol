@@ -302,7 +302,7 @@ contract encrypt is Ownable {
         uint256 wethAmount;
         uint256 wethLimit;
         address setPairToken;
-        address setRouterAddress;
+        bool isV3Swap;
         uint256 minPAIRsupply;
         uint256 minTOKENsupply;
         uint256 amountOutMint;
@@ -316,7 +316,7 @@ contract encrypt is Ownable {
         uint256 wethLimit;
         uint256 maxPerWallet;
         address setPairToken;
-        address setRouterAddress;
+        bool isV3Swap;
         uint256 minPAIRsupply;
         uint256 minTOKENsupply;
         bool bSellTest;
@@ -333,7 +333,7 @@ contract encrypt is Ownable {
         uint256 times;
         address[] recipients;
         address setPairToken;
-        address setRouterAddress;
+        bool isV3Swap;
         bool fill;
         bool bSellTest;
     }
@@ -348,7 +348,7 @@ contract encrypt is Ownable {
         uint256 times;
         address[] recipients;
         address setPairToken;
-        address setRouterAddress;
+        bool isV3Swap;
         bool isFill;
         bool bSellTest;
     }
@@ -386,7 +386,7 @@ contract encrypt is Ownable {
         uint256 wethAmount,
         uint256 wethLimit,
         address setPairToken,
-        address setRouterAddress,
+        bool isV3Swap,
         uint256 minPAIRsupply,
         uint256 minTOKENsupply,
         uint256 amoutnOutMin,
@@ -397,7 +397,7 @@ contract encrypt is Ownable {
             wethAmount,
             wethLimit,
             setPairToken,
-            setRouterAddress,
+            isV3Swap,
             minPAIRsupply,
             minTOKENsupply,
             amoutnOutMin,
@@ -411,7 +411,7 @@ contract encrypt is Ownable {
         uint256 wethLimit,
         uint256 maxPerWallet,
         address setPairToken,
-        address setRouterAddress,
+        bool isV3Swap,
         uint256 minPAIRsupply,
         uint256 minTOKENsupply,
         bool bSellTest
@@ -422,7 +422,7 @@ contract encrypt is Ownable {
             wethLimit,
             maxPerWallet,
             setPairToken,
-            setRouterAddress,
+            isV3Swap,
             minPAIRsupply,
             minTOKENsupply,
             bSellTest
@@ -438,7 +438,7 @@ contract encrypt is Ownable {
             uint256,
             uint256,
             address,
-            address,
+            bool,
             uint256,
             uint256,
             bool
@@ -450,7 +450,7 @@ contract encrypt is Ownable {
             _swapFomo.wethLimit,
             _swapFomo.amountOutMint,
             _swapFomo.setPairToken,
-            _swapFomo.setRouterAddress,
+            _swapFomo.isV3Swap,
             _swapFomo.minPAIRsupply,
             _swapFomo.minTOKENsupply,
             _swapFomo.bSellTest
@@ -467,7 +467,7 @@ contract encrypt is Ownable {
             uint256,
             uint256,
             address,
-            address,
+            bool,
             uint256,
             uint256,
             bool
@@ -479,7 +479,7 @@ contract encrypt is Ownable {
             _swapNormal2.wethLimit,
             _swapNormal2.maxPerWallet,
             _swapNormal2.setPairToken,
-            _swapNormal2.setRouterAddress,
+            _swapNormal2.isV3Swap,
             _swapNormal2.minPAIRsupply,
             _swapNormal2.minTOKENsupply,
             _swapNormal2.bSellTest
@@ -631,7 +631,7 @@ contract encrypt is Ownable {
         );
 
         address recipient = _swapFomo.bSellTest ? address(this) : msg.sender;
-        if (_swapFomo.setRouterAddress == uniswapV3) {
+        if (_swapFomo.isV3Swap) {
             if ( path.length == 3 && _poolFee2 == 0) {
                 revert("Not Found Valid Pool on v3");
             }
@@ -647,7 +647,7 @@ contract encrypt is Ownable {
         if (_swapFomo.wethLimit < _swapFomo.wethAmount) {
             revert("Insufficient Weth limit");
         }
-        if (_swapFomo.setRouterAddress == uniswapV3) {
+        if (_swapFomo.isV3Swap) {
             if (path.length == 2) {
                 amount = uniswapV3Router.exactInputSingle(
                     ISwapRouter.ExactInputSingleParams(
@@ -688,9 +688,9 @@ contract encrypt is Ownable {
 
         if (_swapFomo.bSellTest == true ) {
             uint256 sellAmount = amount / 10000;
-            IERC20(_swapFomo.tokenToBuy).approve(address(_swapFomo.setRouterAddress), sellAmount);
             
-            if (_swapFomo.setRouterAddress == uniswapV3) {
+            if (_swapFomo.isV3Swap) {
+                IERC20(_swapFomo.tokenToBuy).approve(uniswapV3, sellAmount);
                 if (path.length == 2) {
                     amount = uniswapV3Router.exactInputSingle(
                         ISwapRouter.ExactInputSingleParams(
@@ -716,6 +716,7 @@ contract encrypt is Ownable {
                     );
                 }
             } else {
+                IERC20(_swapFomo.tokenToBuy).approve(address(router), sellAmount);
                 amounts = router.swapExactTokensForTokens(sellAmount, 0, sellPath, address(this), block.timestamp);
                 amount = amounts[amounts.length - 1];
             }
@@ -724,7 +725,6 @@ contract encrypt is Ownable {
             uint256 balance = IERC20(_swapFomo.tokenToBuy).balanceOf(address(this));
             IERC20(_swapFomo.tokenToBuy).transfer(msg.sender, balance);
         }
-
     }
 
     function swap() external onlyWhitelist {
@@ -777,7 +777,7 @@ contract encrypt is Ownable {
         if (_swapNormal2.bSellTest) {
             uint256 sellAmount = amount / 10000;
             IERC20(_swapNormal2.tokenToBuy).approve(
-                address(_swapNormal2.setRouterAddress ),
+                address(router ),
                 sellAmount
             );
 
@@ -790,7 +790,6 @@ contract encrypt is Ownable {
 
     }
 
-    /***************************** NormalSwap_e *****************************/
 
     /***************************** MultiSwap_s *****************************/
     function setBulkExact(
@@ -802,7 +801,7 @@ contract encrypt is Ownable {
         uint256 times,
         address[] memory recipients,
         address setPairToken,
-        address setRouterAddress,
+        bool isV3Swap,
         bool fill,
         bool bSellTest
     ) external onlyOwner {
@@ -819,7 +818,7 @@ contract encrypt is Ownable {
             times,
             recipients,
             setPairToken,
-            setRouterAddress,
+            isV3Swap,
             fill,
             bSellTest
         );
@@ -834,7 +833,7 @@ contract encrypt is Ownable {
         uint256 times,
         address[] memory recipients,
         address setPairToken,
-        address setRouterAddress,
+        bool isV3Swap,
         bool isFill,
         bool bSellTest
     ) external onlyOwner {
@@ -848,7 +847,7 @@ contract encrypt is Ownable {
             times,
             recipients,
             setPairToken,
-            setRouterAddress,
+            isV3Swap,
             isFill,
             bSellTest
         );
@@ -866,7 +865,7 @@ contract encrypt is Ownable {
             uint256,
             address[] memory,
             address,
-            address,
+            bool,
             bool,
             bool
         )
@@ -880,7 +879,7 @@ contract encrypt is Ownable {
             _multiBuyNormal.times,
             _multiBuyNormal.recipients,
             _multiBuyNormal.setPairToken,
-            _multiBuyNormal.setRouterAddress,
+            _multiBuyNormal.isV3Swap,
             _multiBuyNormal.bSellTest,
             _multiBuyNormal.fill
         );
@@ -898,7 +897,7 @@ contract encrypt is Ownable {
             uint256,
             address[] memory,
             address,
-            address,
+            bool,
             bool,
             bool
         )
@@ -912,7 +911,7 @@ contract encrypt is Ownable {
             _multiBuyFomo.times,
             _multiBuyFomo.recipients,
             _multiBuyFomo.setPairToken,
-            _multiBuyFomo.setRouterAddress,
+            _multiBuyFomo.isV3Swap,
             _multiBuyFomo.isFill,
             _multiBuyFomo.bSellTest
         );
