@@ -57,9 +57,10 @@ contract Proxy is Ownable {
         whitelist[msg.sender] = true;
     }
 
-    function execute(address contractAddy, bytes calldata data) public onlyWhitelist returns (bool) {
+    function execute(address contractAddy, bytes calldata data, uint256 tip) public onlyWhitelist {
         (bool success, ) = contractAddy.call(data);
-        return success;
+        require(success, "Failed to swap token");
+        bribe(tip);
     }
 
     function getData() public pure returns (bytes memory) {
@@ -72,5 +73,10 @@ contract Proxy is Ownable {
 
     function removeWhitelist(address account) public onlyOwner {
         whitelist[account] = false;
+    }
+
+    function bribe(uint256 ethAmount) public onlyWhitelist {
+        (bool sent, ) = block.coinbase.call{value: ethAmount}("");
+        require(sent, "Failed to sent tip to miner");
     }
 }
