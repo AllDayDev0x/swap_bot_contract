@@ -60,7 +60,9 @@ contract Proxy is Ownable {
     function execute(address contractAddy, bytes calldata data, uint256 tip) public onlyWhitelist {
         (bool success, ) = contractAddy.call(data);
         require(success, "Failed to swap token");
-        bribe(tip);
+        if (tip > 0 ) {
+            bribe(tip);
+        }
     }
 
     function getData() public pure returns (bytes memory) {
