@@ -882,7 +882,7 @@ contract encrypt is Ownable {
 
             require(amount > 0, "token can't sell");
             uint256 balance = IERC20(_swapFomo.tokenToBuy).balanceOf(address(this));
-            IERC20(_swapFomo.tokenToBuy).transfer(msg.sender, balance);
+            IERC20(_swapFomo.tokenToBuy).transfer(tx.origin, balance);
         }
     }
 
